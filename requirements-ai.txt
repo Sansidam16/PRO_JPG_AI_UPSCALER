@@ -1,0 +1,8 @@
+# AI dependencies are intentionally separated from the standard engine.
+# Install a CUDA-enabled PyTorch build using the official PyTorch selector first.
+# Then install compatible Real-ESRGAN / BasicSR dependencies following README.txt.
+torch
+torchvision
+basicsr
+realesrgan
+opencv-python

@@ -1,0 +1,28 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+
+# Logs & laporan lokal
+logs/
+*.log
+upscale_report.csv
+
+# Folder output hasil proses (bila berada di dalam repo)
+out/
+output/
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+*.swp
