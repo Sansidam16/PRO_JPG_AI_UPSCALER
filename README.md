@@ -85,6 +85,41 @@ python -c "import torch; print(torch.__version__); print(torch.cuda.is_available
 
 Model AI dimuat **sekali per batch** untuk efisiensi memori. Model yang tersedia dibaca otomatis dari folder `models/`.
 
+### 4.1 Versi Portable (Windows)
+
+Aplikasi dapat dibungkus menjadi **folder portable** (onedir) yang berisi runtime Python + PyTorch/CUDA, sehingga pengguna akhir **tidak perlu memasang Python**. Artefak hasil build:
+
+- Folder portable: `dist/PRO_JPG_AI_UPSCALER/`
+- Arsip distribusi: `dist/PRO_JPG_AI_UPSCALER_portable_win64.zip`
+
+Struktur paket portable:
+
+```
+PRO_JPG_AI_UPSCALER/
+├─ PRO_JPG_AI_UPSCALER.exe   # jalankan ini (klik dua kali)
+├─ _internal/                # runtime + PyTorch/CUDA (jangan diubah)
+├─ models/                   # model .pth (dapat ditambah/diganti sendiri)
+├─ assets/                   # profil sRGB IEC61966-2.1
+├─ config/                   # settings.json (pengaturan tersimpan)
+└─ logs/
+```
+
+Cara pakai: ekstrak ZIP, lalu jalankan `PRO_JPG_AI_UPSCALER.exe`. Semua data (pengaturan, log, model) berada **di samping exe**, sehingga paket benar-benar portable (dapat dijalankan dari flashdisk).
+
+- Untuk fitur AI, PC tujuan tetap memerlukan **GPU NVIDIA + driver** (CUDA 12.4 sudah dibundel). Engine Standard dapat dipakai tanpa GPU.
+- Ukuran besar (±4,1 GB) berasal dari library PyTorch + CUDA dan model.
+
+Build ulang:
+
+```bat
+.venv\Scripts\python -m pip install --upgrade pyinstaller pyinstaller-hooks-contrib
+.venv\Scripts\python -m PyInstaller --noconfirm --clean --windowed --name PRO_JPG_AI_UPSCALER ^
+    --collect-all realesrgan --collect-all basicsr --collect-all cv2 ^
+    --hidden-import torch --hidden-import torchvision main.py
+```
+
+Setelah build, salin `models/`, `assets/`, dan `config/` ke dalam `dist/PRO_JPG_AI_UPSCALER/`. Folder `build/` dan `dist/` diabaikan oleh Git (lihat `.gitignore`).
+
 ---
 
 ## 5. Panduan Antarmuka (UI)
@@ -113,36 +148,40 @@ Jendela terbagi menjadi beberapa area. Ukuran jendela menyesuaikan layar laptop 
 
 ### 5.4 Tab "Output"
 
-| Kontrol | Fungsi |
-| --- | --- |
-| **Engine** | `AI` (Real-ESRGAN) atau `Standard` (Lanczos/Bicubic). |
-| **AI Model** | Pilih model dari folder `models/`. Daftar dimuat dinamis. |
-| **Output preset** | Ukuran target: 1920×600, 1920×700, 1920×900, 3543×4961, 4961×3543, atau Custom. |
-| **Resize mode** | Cara menyesuaikan gambar ke target: Exact Canvas, Preserve Aspect Ratio, Fit, Crop, Stretch. |
-| **Canvas fill** | Pengisian sisa kanvas (Exact Canvas/Fit): **Edge Extension** (default) atau Background Color. |
-| **Background (hex)** | Warna latar, contoh `#FFFFFF`. Dipakai bila Canvas fill = Background Color. |
-| **Width / Height (px)** | Dimensi target manual (16–20000). Mengubahnya otomatis mengeset preset ke `Custom`. |
-| **Standard filter** | Filter resize Standar/baseline: Lanczos atau Bicubic. |
-| **Tile size (AI)** | Ukuran tile inferensi (128–512). Tile lebih kecil menurunkan pemakaian VRAM. |
-| **JPEG Quality** | 95 / 98 / 100. |
-| **Chroma subsampling** | 4:4:4 (terbaik) / 4:2:2 / 4:2:0. |
-| **DPI 300 x 300** | Tetap (label). Metadata resolusi output. |
-| **Nama = file asli** | Jika dicentang, output memakai nama file asli; jika tidak, ditambah `_PRO_UPSCALED`. |
-| **Simpan PSD** | Jika dicentang, selain JPG juga menyimpan PSD 8-bit RGB. |
-| **Skip yang sudah ada** | Lewati file yang output JPG-nya sudah ada. |
-| **Suara selesai** | Bunyi penanda saat proses batch selesai. |
+Mengatur ke mana dan bagaimana gambar hasil ditulis.
+
+| Kontrol | Fungsi | Catatan / Pengaruh |
+| --- | --- | --- |
+| **Engine** | `AI` (Real-ESRGAN + Lanczos blending) atau `Standard` (hanya resize Lanczos/Bicubic, tanpa GPU). | Tidak memengaruhi ukuran file. |
+| **AI Model** | Pilih model dari folder `models/`. Daftar dimuat dinamis. | `RealESRGAN_x4plus` untuk foto/umum; `..._anime_6B` untuk ilustrasi. |
+| **Output preset** | Ukuran target: 1920×600, 1920×700, 1920×900, 3543×4961, 4961×3543, atau Custom. | Memilih preset otomatis mengisi Width/Height. |
+| **Resize mode** | Exact Canvas, Preserve Aspect Ratio, Fit, Crop, Stretch. | Exact Canvas/Fit = seluruh gambar + isi sisa kanvas; Preserve Aspect Ratio = rasio asli tanpa padding/crop; Crop = penuhi target lalu potong tengah; Stretch = ubah rasio agar pas target. |
+| **Canvas fill** | Pengisian sisa kanvas (Exact Canvas/Fit): **Edge Extension** (default) atau Background Color. | Edge Extension (replikasi piksel tepi) menghasilkan area datar yang mengompres lebih efisien. |
+| **Background (hex)** | Warna latar, contoh `#FFFFFF`. | Hanya dipakai bila Canvas fill = Background Color. |
+| **Width / Height (px)** | Dimensi target manual (16–20000). Mengubahnya otomatis mengeset preset ke `Custom`. | **Faktor terbesar penentu ukuran file.** |
+| **Standard filter** | Filter resize Standar/baseline: Lanczos (tajam) atau Bicubic (halus). | Dipakai juga untuk baseline yang dicampur dengan hasil AI. |
+| **Tile size (AI)** | Ukuran tile inferensi (128–512). | Tile lebih kecil menurunkan pemakaian VRAM (aman untuk GPU kecil); tidak mengubah hasil akhir maupun ukuran file. |
+| **JPEG Quality** | 95 / 98 / 100. | **Berpengaruh besar** ke ukuran file (95 → 100 bisa +1,5–2,5×). |
+| **Chroma subsampling** | 4:4:4 (warna penuh) / 4:2:2 / 4:2:0. | 4:4:4 = file terbesar; 4:2:0 ±20–40% lebih kecil. Untuk kualitas tinggi gunakan 4:4:4. |
+| **DPI 300 x 300** | Tetap (label). Metadata resolusi cetak output. | **Metadata saja** — tidak menambah jumlah piksel, hampir tidak memengaruhi ukuran file. |
+| **Nama = file asli** | Jika dicentang, output memakai nama file asli; jika tidak, ditambah `_PRO_UPSCALED`. | Tidak memengaruhi ukuran file. |
+| **Simpan PSD** | Jika dicentang, selain JPG juga menyimpan PSD 8-bit RGB (kompresi RLE PackBits). | Menambah file kedua; PSD jauh lebih besar daripada JPG (5–15×). |
+| **Skip yang sudah ada** | Lewati file yang output JPG-nya sudah ada. | Menghemat waktu saat batch diulang. |
+| **Suara selesai** | Bunyi penanda saat proses batch selesai. | Nada chime 880 Hz → 1175 Hz. |
 
 ### 5.5 Tab "AI & Quality"
 
-| Kontrol | Fungsi |
-| --- | --- |
-| **AI Strength (%)** | Bobot hasil AI (0–100). 0 = murni Lanczos, 100 = murni AI. |
-| **AI Strength preset** | Conservative 20 / Balanced 30 / Enhanced 50 / Full AI 100 / Custom. |
-| **Detail Enhancement** | Off / Low / Medium / High — menambah satu pass penajaman detail (digabung dengan sharpening). |
-| **Noise Reduction** | Off / Low / Medium / High — diterapkan pada sumber sebelum upscaling. |
-| **Sharpening Amount** | Kekuatan sharpening (0–300). |
-| **Sharpening Radius** | Radius pada resolusi referensi 2048 px (0.1–5.0); diskalakan ke dimensi output. |
-| **Sharpening Threshold** | Ambang minimum detail yang diperkuat (0–50). |
+Mengatur seberapa kuat AI dan penajaman diterapkan pada hasil akhir.
+
+| Kontrol | Fungsi | Catatan / Pengaruh |
+| --- | --- | --- |
+| **AI Strength (%)** | Bobot hasil AI (0–100): `Final = (1−α)·Lanczos + α·AI`. | 0 = murni Lanczos, 100 = murni AI. |
+| **AI Strength preset** | Conservative 20 / Balanced 30 / Enhanced 50 / Full AI 100 / Custom. | Pintasan untuk mengisi AI Strength. |
+| **Detail Enhancement** | Off / Low / Medium / High. | Digabung ke **satu pass** dengan sharpening (menambah radius & kekuatan). |
+| **Noise Reduction** | Off / Low / Medium / High (bawaan Off). | Diterapkan pada sumber sebelum upscaling; level tinggi bisa menghilangkan tekstur halus. |
+| **Sharpening Amount** | Kekuatan sharpening tambahan (0–300). | Ditambahkan di atas Detail Enhancement (total dibatasi 300%). Default 8. |
+| **Sharpening Radius** | Radius pada resolusi referensi 2048 px (0.1–5.0); diskalakan ke dimensi output. | **Sadar-dimensi**: dibatasi 0.3–3.0 px setelah skala. Default 0.6. |
+| **Sharpening Threshold** | Ambang minimum detail yang diperkuat (0–50). | Lebih tinggi = hanya tepi kuat yang dipertajam; area datar/gradasi/bokeh terlindungi (anti-halo). Default 4. |
 
 > Catatan: sharpening bersifat *edge-aware* (menggunakan edge mask + protection mask) sehingga area gradasi/bokeh tidak tersentuh; lihat bagian 7.
 
@@ -157,6 +196,21 @@ Jendela terbagi menjadi beberapa area. Ukuran jendela menyesuaikan layar laptop 
 
 - **Progress** — status teks, progress bar, dan hitungan `berhasil / gagal`.
 - **Processing Log** — catatan langkah proses per gambar, ringkasan waktu, arsitektur model, dsb.
+
+### 5.8 Ukuran File Output
+
+Ukuran file hasil ditentukan oleh beberapa faktor, dari yang paling berpengaruh:
+
+1. **Dimensi output (Width × Height)** — faktor dominan. Mis. 4961×3543 ≈ 17,6 MP, jauh lebih besar daripada 1920×1080.
+2. **Simpan PSD diaktifkan** — menambah file kedua yang jauh lebih besar daripada JPG.
+3. **JPEG Quality** — 95 → 100 dapat menaikkan ukuran sekitar 1,5–2,5×.
+4. **Chroma subsampling** — `4:4:4` paling besar, `4:2:0` sekitar 20–40% lebih kecil.
+5. **Kompleksitas isi gambar** — foto bertekstur/noise tinggi menghasilkan file lebih besar daripada latar polos. Noise Reduction sedikit mengecilkan file; sharpening yang menambah detail halus memperbesar file.
+6. **Resize mode & Canvas fill** — area datar (Edge Extension) mengompres jauh lebih efisien daripada `Stretch` yang mengubah seluruh piksel.
+
+Tidak memengaruhi ukuran file: **DPI** (metadata), **Nama = file asli**, **Tile size**, **AI Strength**, dan pilihan **Engine**.
+
+Semua JPG otomatis memakai `optimize=True` + `progressive=True`, serta disematkan profil `sRGB IEC61966-2.1`.
 
 ---
 

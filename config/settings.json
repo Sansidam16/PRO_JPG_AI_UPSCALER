@@ -24,6 +24,7 @@
   "tile_pad": 10,
   "skip_existing": false,
   "output_naming": "original",
-  "save_psd": false,
+  "save_psd": true,
+  "sound_on_done": true,
   "output_suffix": "_PRO_UPSCALED"
 }
