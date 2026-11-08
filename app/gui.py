@@ -4,7 +4,7 @@ from pathlib import Path
 import threading
 import queue
 
-from app.settings import load_settings, save_settings, MODELS_DIR
+from app.settings import load_settings, save_settings, MODELS_DIR, ASSETS_DIR
 from app.theme import apply_theme
 from core.image_ops import PRESETS, RESIZE_MODES, CANVAS_FILL_MODES
 from core.gpu_manager import status as gpu_status
@@ -22,6 +22,7 @@ class UpscalerApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("PRO JPG AI Upscaler")
+        self._apply_window_icon()
         screen_w = self.winfo_screenwidth()
         screen_h = self.winfo_screenheight()
         win_w = min(1060, max(760, screen_w - 60))
@@ -72,6 +73,14 @@ class UpscalerApp(tk.Tk):
         self._build_ui()
         self.after(100, self._poll_events)
         self._check_gpu()
+
+    def _apply_window_icon(self):
+        icon_path = ASSETS_DIR / "icon.ico"
+        try:
+            if icon_path.exists():
+                self.iconbitmap(default=str(icon_path))
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------ UI ---
     def _build_ui(self):
